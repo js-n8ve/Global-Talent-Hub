@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "TaskAway"
+description = "A premium job discovery platform connecting African professionals with verified remote, hybrid, and full-time opportunities from international companies."
+version = "1.0.0"
+id = "artifacts/taskaway"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20918
+
+[services.development]
+run = "pnpm --filter @workspace/taskaway run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/taskaway", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/taskaway/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20918"
+BASE_PATH = "/"
