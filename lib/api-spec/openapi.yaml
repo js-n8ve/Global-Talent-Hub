@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: TaskAway roles, applications, employer checkout, and review API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: jobs
+    description: Public job discovery and employer listings
+  - name: applications
+    description: Candidate applications and employer review
+  - name: account
+    description: Authenticated account onboarding
+  - name: payments
+    description: Employer job-post checkout
+  - name: admin
+    description: Listing moderation
 paths:
   /healthz:
     get:
@@ -24,13 +34,440 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMyProfile
+      tags: [account]
+      summary: Get the signed-in user's profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /me/role:
+    patch:
+      operationId: setMyRole
+      tags: [account]
+      summary: Choose candidate or employer account mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleSelection"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: Search published roles
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: workMode
+          in: query
+          schema: { type: string, enum: [Remote, Hybrid, On-site] }
+        - name: employmentType
+          in: query
+          schema: { type: string, enum: [Full-time, Contract, Part-time] }
+      responses:
+        "200":
+          description: Published roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create an employer listing awaiting payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobInput"
+      responses:
+        "201":
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a published role
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Role details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /jobs/{id}/applications:
+    post:
+      operationId: applyToJob
+      tags: [applications]
+      summary: Submit an application to a published role
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationInput"
+      responses:
+        "201":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateApplication"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /me/applications:
+    get:
+      operationId: listMyApplications
+      tags: [applications]
+      summary: List the signed-in candidate's applications
+      responses:
+        "200":
+          description: Candidate applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CandidateApplication" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /employer/jobs:
+    get:
+      operationId: listEmployerJobs
+      tags: [jobs]
+      summary: List the signed-in employer's roles
+      responses:
+        "200":
+          description: Employer listings
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /employer/jobs/{id}/checkout:
+    post:
+      operationId: startJobCheckout
+      tags: [payments]
+      summary: Start hosted checkout for one job listing
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Hosted checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /employer/jobs/{id}/verify-payment:
+    post:
+      operationId: verifyJobPayment
+      tags: [payments]
+      summary: Verify payment with Whop after checkout
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Server-verified payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentVerification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /employer/applications:
+    get:
+      operationId: listEmployerApplications
+      tags: [applications]
+      summary: List applications to the employer's roles
+      responses:
+        "200":
+          description: Employer applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EmployerApplication" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /employer/applications/{id}:
+    patch:
+      operationId: updateApplicationStatus
+      tags: [applications]
+      summary: Update an application on the employer's role
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationStatusUpdate"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployerApplication"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/jobs:
+    get:
+      operationId: listJobsForReview
+      tags: [admin]
+      summary: List paid roles awaiting moderation
+      responses:
+        "200":
+          description: Review queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/jobs/{id}/review:
+    patch:
+      operationId: reviewJob
+      tags: [admin]
+      summary: Approve or reject a paid job listing
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobReview"
+      responses:
+        "200":
+          description: Reviewed listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  responses:
+    Unauthorized:
+      description: Sign in required
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Insufficient access
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflicting request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
   schemas:
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
+      required: [status]
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [candidate, employer, admin] }
+      required: [id, email, name, role]
+    RoleSelection:
+      type: object
+      properties:
+        role: { type: string, enum: [candidate, employer] }
+      required: [role]
+    Job:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        company: { type: string }
+        companyWebsite: { type: ["string", "null"] }
+        category: { type: string }
+        location: { type: string }
+        workMode: { type: string, enum: [Remote, Hybrid, On-site] }
+        employmentType: { type: string, enum: [Full-time, Contract, Part-time] }
+        salaryMin: { type: number }
+        salaryMax: { type: number }
+        currency: { type: string }
+        salaryPeriod: { type: string, enum: [year, month, hour] }
+        timezone: { type: string }
+        description: { type: string }
+        requirements:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [pending_payment, pending_review, published, rejected, expired] }
+        verified: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        publishedAt: { type: ["string", "null"], format: date-time }
+        reviewNote: { type: ["string", "null"] }
+      required: [id, title, company, companyWebsite, category, location, workMode, employmentType, salaryMin, salaryMax, currency, salaryPeriod, timezone, description, requirements, status, verified, createdAt, publishedAt, reviewNote]
+    JobInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 2, maxLength: 100 }
+        company: { type: string, minLength: 2, maxLength: 100 }
+        companyWebsite: { type: ["string", "null"], format: uri }
+        category: { type: string, minLength: 2, maxLength: 60 }
+        location: { type: string, minLength: 2, maxLength: 100 }
+        workMode: { type: string, enum: [Remote, Hybrid, On-site] }
+        employmentType: { type: string, enum: [Full-time, Contract, Part-time] }
+        salaryMin: { type: number, minimum: 0 }
+        salaryMax: { type: number, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        salaryPeriod: { type: string, enum: [year, month, hour] }
+        timezone: { type: string, maxLength: 80 }
+        description: { type: string, minLength: 20, maxLength: 5000 }
+        requirements:
+          type: array
+          items: { type: string, minLength: 2, maxLength: 240 }
+          maxItems: 20
+      required: [title, company, category, location, workMode, employmentType, salaryMin, salaryMax, currency, salaryPeriod, timezone, description, requirements]
+    ApplicationInput:
+      type: object
+      properties:
+        coverLetter: { type: string, maxLength: 5000 }
+        portfolioUrl: { type: ["string", "null"], format: uri }
+        consent: { type: boolean, enum: [true] }
+      required: [coverLetter, consent]
+    CandidateApplication:
+      type: object
+      properties:
+        id: { type: string }
+        jobId: { type: string }
+        jobTitle: { type: string }
+        company: { type: string }
+        status: { type: string, enum: [submitted, in_review, shortlisted, rejected, withdrawn] }
+        coverLetter: { type: string }
+        portfolioUrl: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, jobId, jobTitle, company, status, coverLetter, portfolioUrl, createdAt]
+    EmployerApplication:
+      allOf:
+        - $ref: "#/components/schemas/CandidateApplication"
+        - type: object
+          properties:
+            candidateName: { type: string }
+            candidateEmail: { type: string, format: email }
+          required: [candidateName, candidateEmail]
+    ApplicationStatusUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [in_review, shortlisted, rejected] }
+      required: [status]
+    CheckoutSession:
+      type: object
+      properties:
+        jobId: { type: string }
+        checkoutUrl: { type: string, format: uri }
+        status: { type: string, enum: [pending, paid, pending_review] }
+        price: { type: number }
+        currency: { type: string }
+      required: [jobId, checkoutUrl, status, price, currency]
+    PaymentVerification:
+      type: object
+      properties:
+        paid: { type: boolean }
+        jobStatus: { type: string, enum: [pending_payment, pending_review, published, rejected, expired] }
+        message: { type: string }
+      required: [paid, jobStatus, message]
+    JobReview:
+      type: object
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        note: { type: string, maxLength: 1000 }
+      required: [decision]
 
