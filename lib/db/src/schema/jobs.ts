@@ -51,6 +51,7 @@ export const jobsTable = pgTable(
     verified: boolean("verified").notNull().default(false),
     reviewNote: text("review_note"),
     whopCheckoutConfigId: text("whop_checkout_config_id"),
+    whopCheckoutUrl: text("whop_checkout_url"),
     whopPaymentId: text("whop_payment_id"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
